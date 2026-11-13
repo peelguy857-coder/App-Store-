@@ -53,3 +53,12 @@ lib/samples/       sample apps' HTML (Star Catcher, Quick Notes, Calculator, Pix
 public/            the store front end (vanilla JS single-page app)
 test/              API tests (node:test)
 ```
+
+## Hosted version (claude.ai link)
+
+`hosted/app-store.html` is a single-page version of the store that runs as a claude.ai Artifact,
+so it opens on any phone or computer with a link. It uses the artifact's shared database instead of
+the Node server and claude.ai sign-in instead of store accounts. Each developer's apps live under
+`devs/<their id>`, with app code at `devs/<id>/code/<appId>`. Each person's downloads, reviews and opens
+live under `installs/`, `reviews/` and `opens/` in documents only they can write. Data an app saves is
+kept privately per person.

@@ -1,0 +1,980 @@
+<title>App Store</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: sticky top bar with search + tabs (a bottom tab bar on phones), one centered column of shelves and app cards; apps open in a full-screen player. */
+:root {
+  --bg: #f4f5f8;
+  --surface: #ffffff;
+  --surface-2: #eceef3;
+  --text: #15171d;
+  --muted: #5f6676;
+  --line: #e0e3ea;
+  --accent: #1f5eff;
+  --accent-text: #ffffff;
+  --accent-soft: #e2eaff;
+  --ink: #101829;
+  --ink-text: #f3f5fa;
+  --danger: #d0302f;
+  --star: #e8950c;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 4px 16px rgba(16, 24, 40, .06);
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --radius: 16px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d0f14; --surface: #171a21; --surface-2: #21252e; --text: #eef0f5; --muted: #9ba2b0;
+    --line: #2a2f3a; --accent: #5b8cff; --accent-text: #ffffff; --accent-soft: #1b2948;
+    --ink: #1c2540; --ink-text: #f3f5fa; --danger: #f2706f; --star: #f2b23a;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d0f14; --surface: #171a21; --surface-2: #21252e; --text: #eef0f5; --muted: #9ba2b0;
+  --line: #2a2f3a; --accent: #5b8cff; --accent-text: #ffffff; --accent-soft: #1b2948;
+  --ink: #1c2540; --ink-text: #f3f5fa; --danger: #f2706f; --star: #f2b23a;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font: 15px/1.5 var(--font-body); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+a { color: inherit; text-decoration: none; }
+button, input, select, textarea { font: inherit; color: inherit; }
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.15; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--surface); border-bottom: 1px solid var(--line); }
+.topbar-inner { max-width: 1120px; margin: 0 auto; padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; align-items: center; gap: 14px; }
+.brand { display: flex; align-items: center; gap: 8px; font: 700 18px var(--font-display); white-space: nowrap; cursor: pointer; }
+.brand-mark { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--accent); color: var(--accent-text); }
+.search { flex: 1; max-width: 420px; position: relative; margin: 0; }
+.search input { width: 100%; padding: 9px 14px 9px 36px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); outline: none; }
+.search input:focus { border-color: var(--accent); }
+.search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+.nav { display: flex; gap: 4px; margin-left: auto; }
+.nav a { padding: 8px 12px; border-radius: 999px; color: var(--muted); font-weight: 500; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+.nav a:hover { background: var(--surface-2); color: var(--text); }
+.nav a.on { background: var(--accent-soft); color: var(--accent); }
+.nav svg { display: none; }
+.who { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; white-space: nowrap; }
+.who img { width: 26px; height: 26px; border-radius: 50%; }
+
+@media (max-width: 720px) {
+  .topbar-inner { flex-wrap: wrap; }
+  .search { order: 3; max-width: none; flex-basis: 100%; }
+  .who span { display: none; }
+  .nav { position: fixed; bottom: 0; left: 0; right: 0; margin: 0; z-index: 30; background: var(--surface); border-top: 1px solid var(--line); justify-content: space-around;
+    padding: 6px max(4px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(4px, env(safe-area-inset-left, 0px)); }
+  .nav a { flex-direction: column; gap: 2px; font-size: 11px; padding: 4px 14px; border-radius: 10px; }
+  .nav svg { display: block; }
+  main.page { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important; }
+}
+
+main.page { max-width: 1120px; margin: 0 auto; padding-block: 20px 60px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.section { margin-top: 30px; }
+.section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; gap: 12px; flex-wrap: wrap; }
+.section-head h2 { font-size: 20px; }
+.linkish { color: var(--accent); font-weight: 500; font-size: 14px; background: none; border: 0; cursor: pointer; padding: 0; }
+
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.chip { padding: 7px 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); white-space: nowrap; font-weight: 500; cursor: pointer; }
+.chip.on, .chip:hover { border-color: var(--accent); color: var(--accent); }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 18px; border-radius: 999px; border: 0; cursor: pointer; background: var(--surface-2); font-weight: 600; white-space: nowrap; }
+.btn:hover { filter: brightness(.96); }
+.btn.primary { background: var(--accent); color: var(--accent-text); }
+.btn.danger { background: transparent; color: var(--danger); border: 1px solid currentColor; }
+.btn.sm { padding: 5px 14px; font-size: 13px; }
+.btn.get { min-width: 76px; background: var(--accent-soft); color: var(--accent); }
+.btn.get.open { background: var(--accent); color: var(--accent-text); }
+.btn:disabled { opacity: .55; cursor: default; }
+
+.icon { width: 64px; height: 64px; border-radius: 22%; flex: none; display: grid; place-items: center; font-size: 34px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+.icon img { width: 100%; height: 100%; object-fit: cover; }
+.icon.lg { width: 120px; height: 120px; font-size: 64px; }
+.icon.sm { width: 44px; height: 44px; font-size: 24px; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 12px; }
+.card { display: flex; align-items: center; gap: 14px; padding: 14px; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); min-width: 0; cursor: pointer; }
+.card:hover { outline: 2px solid var(--accent-soft); }
+.card .info { flex: 1; min-width: 0; }
+.card .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .tag { color: var(--muted); font-size: 13px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.card .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.stars { color: var(--star); letter-spacing: 1px; }
+
+.hero { display: flex; align-items: center; gap: 24px; padding: 28px; border-radius: 24px; background: var(--ink); color: var(--ink-text); box-shadow: var(--shadow); cursor: pointer; position: relative; overflow: hidden; }
+.hero::after { content: ""; position: absolute; right: -60px; top: -60px; width: 260px; height: 260px; border-radius: 50%; border: 40px solid rgba(255,255,255,.05); pointer-events: none; }
+.hero .eyebrow { text-transform: uppercase; letter-spacing: .1em; font-size: 12px; opacity: .75; font-weight: 600; }
+.hero h1 { font-size: 32px; margin: 6px 0; }
+.hero p { margin: 0 0 14px; opacity: .85; max-width: 520px; }
+.hero .btn { background: #ffffff; color: #101829; }
+@media (max-width: 560px) { .hero { flex-direction: column; align-items: flex-start; padding: 22px; } .hero .icon.lg { width: 88px; height: 88px; font-size: 48px; } }
+
+.devbanner { margin-top: 30px; padding: 22px; border-radius: 20px; background: var(--surface); box-shadow: var(--shadow); display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.devbanner > div { min-width: 0; flex: 1 1 280px; }
+
+.detail-head { display: flex; gap: 22px; align-items: flex-start; }
+.detail-head > div { min-width: 0; }
+.detail-head h1 { font-size: 28px; }
+.detail-head .dev { color: var(--accent); font-weight: 500; cursor: pointer; }
+.detail-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+@media (max-width: 560px) { .detail-head { gap: 14px; } .detail-head .icon.lg { width: 88px; height: 88px; font-size: 48px; } .detail-head h1 { font-size: 22px; } }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); margin-top: 22px; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 0; font-variant-numeric: tabular-nums; }
+.stat { text-align: center; padding: 0 8px; border-left: 1px solid var(--line); min-width: 0; }
+.stat:first-child { border-left: 0; }
+.stat b { display: block; font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stat span { font-size: 12px; color: var(--muted); }
+@media (max-width: 560px) { .stats.six { grid-template-columns: repeat(3, 1fr); row-gap: 14px; } .stats.six .stat:nth-child(3n+1) { border-left: 0; } }
+
+.panel { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; min-width: 0; }
+.desc { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 70ch; }
+.versions { list-style: none; padding: 0; margin: 0; }
+.versions li { padding: 10px 0; border-top: 1px solid var(--line); }
+.versions li:first-child { border-top: 0; padding-top: 0; }
+.review { padding: 14px 0; border-top: 1px solid var(--line); }
+.review:first-child { border-top: 0; }
+.review-head { display: flex; justify-content: space-between; gap: 10px; }
+.star-pick { display: flex; gap: 2px; font-size: 28px; }
+.star-pick button { background: none; border: 0; cursor: pointer; color: var(--line); padding: 0 2px; }
+.star-pick button.on { color: var(--star); }
+
+.form { display: grid; gap: 16px; max-width: 720px; }
+.field { display: grid; gap: 6px; min-width: 0; }
+.field label { font-weight: 600; font-size: 14px; }
+.hint { font-size: 12px; color: var(--muted); }
+.form input[type=text], .form select, .form textarea, .input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); outline: none; }
+.form input:focus, .form select:focus, .form textarea:focus { border-color: var(--accent); }
+.form textarea.code { font: 13px/1.45 var(--font-mono); min-height: 260px; tab-size: 2; white-space: pre; overflow-x: auto; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.row > .field { flex: 1; min-width: 160px; }
+.icon-edit { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.icon-edit input[type=color] { width: 44px; height: 38px; border: 0; padding: 0; background: none; cursor: pointer; }
+.icon-edit .emoji-in { width: 80px; text-align: center; font-size: 20px; }
+.error { color: var(--danger); font-weight: 500; }
+
+.dev-row { display: flex; align-items: center; gap: 14px; padding: 14px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.dev-row:first-child { border-top: 0; }
+.dev-row .info { flex: 1; min-width: 160px; }
+.dev-row .nums { display: flex; gap: 18px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+.home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 22px 12px; }
+.home-app { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; cursor: pointer; background: none; border: 0; padding: 0; }
+.home-app .icon { width: 72px; height: 72px; font-size: 38px; transition: transform .12s; }
+.home-app:hover .icon { transform: scale(1.06); }
+.home-app span { font-size: 13px; max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.empty { text-align: center; padding: 50px 20px; color: var(--muted); }
+.empty .big { font-size: 44px; }
+.note { padding: 12px 14px; border-radius: 12px; background: var(--accent-soft); color: var(--text); font-size: 14px; }
+
+.player { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; background: var(--bg); }
+.player-bar { display: flex; align-items: center; gap: 10px; background: var(--surface); border-bottom: 1px solid var(--line);
+  padding: calc(8px + env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) 8px max(12px, env(safe-area-inset-left, 0px)); }
+.player-bar .title { flex: 1; display: flex; align-items: center; gap: 10px; font-weight: 600; min-width: 0; }
+.player-bar .title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player-bar .icon { width: 30px; height: 30px; font-size: 17px; }
+.player iframe { flex: 1; width: 100%; border: 0; background: #ffffff; padding-bottom: env(safe-area-inset-bottom, 0px); }
+.iconbtn { background: var(--surface-2); border: 0; border-radius: 999px; padding: 7px 12px; cursor: pointer; font-weight: 600; white-space: nowrap; }
+
+#toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%) translateY(20px); opacity: 0; background: var(--text); color: var(--bg);
+  padding: 10px 18px; border-radius: 999px; z-index: 100; transition: .2s; pointer-events: none; font-weight: 500; max-width: calc(100vw - 32px); }
+#toast.show { opacity: 1; transform: translateX(-50%); }
+@media (max-width: 720px) { #toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" id="brand" href="#discover"><span class="brand-mark">A</span>App Store</a>
+    <form class="search" id="searchForm" role="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="searchInput" type="search" placeholder="Search apps, games, developers" aria-label="Search apps">
+    </form>
+    <nav class="nav" id="nav">
+      <a href="#discover" data-nav="discover"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z" fill="currentColor"/></svg>Discover</a>
+      <a href="#library" data-nav="library"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>My Apps</a>
+      <a href="#developer" data-nav="developer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/></svg>Developer</a>
+    </nav>
+    <div class="who" id="who"></div>
+  </div>
+</header>
+<main class="page" id="view">
+  <div class="empty"><div class="big">🛍️</div><p>Opening the store…</p></div>
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+const $ = (sel, root = document) => root.querySelector(sel);
+const view = $('#view');
+const CATEGORIES = ['Games', 'Productivity', 'Utilities', 'Education', 'Creativity', 'Lifestyle', 'Social', 'Other'];
+const MAX_CODE = 200 * 1024;
+
+const S = {
+  db: null, user: null, downloads: null, uid: null, me: null,
+  canWrite: null,          // may write shared docs (null = unknown, let writes decide)
+  personalOk: true,        // may write own installs/reviews; false -> keep them on this device
+  loaded: { devs: false },
+  devs: new Map(), installs: new Map(), reviews: new Map(), opens: new Map(),
+  route: { name: 'discover' }, query: '', sort: 'popular',
+};
+let activePlayer = null;
+
+// ---------- small helpers ----------
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmtNum = (n) => n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K' : String(n);
+const fmtSize = (b) => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : b >= 1024 ? Math.round(b / 1024) + ' KB' : b + ' B';
+const fmtDate = (iso) => { try { return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); } catch { return ''; } };
+const now = () => new Date().toISOString();
+const newId = () => { const a = 'abcdefghijkmnpqrstuvwxyz23456789'; const r = crypto.getRandomValues(new Uint8Array(10)); return Array.from(r, (x) => a[x % a.length]).join(''); };
+const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ } };
+
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// One write at a time per document.
+const writeChains = new Map();
+function write(path, fn) {
+  const prev = writeChains.get(path) || Promise.resolve();
+  const next = prev.catch(() => {}).then(() => fn(S.db.doc(path)));
+  writeChains.set(path, next);
+  return next;
+}
+
+function iconHTML(icon, cls = '') {
+  icon = icon || { type: 'emoji', emoji: '✨', bg: '#6366f1' };
+  const bg = /^#[0-9a-fA-F]{6}$/.test(icon.bg || '') ? icon.bg : '#6366f1';
+  const inner = icon.type === 'image' && /^data:image\/(png|jpeg|webp|gif);base64,/.test(icon.data || '') ? `<img src="${esc(icon.data)}" alt="">` : esc(icon.emoji || '✨');
+  return `<div class="icon ${cls}" style="background:${bg}">${inner}</div>`;
+}
+const starsHTML = (avg) => { const f = Math.round(avg); return `<span class="stars" aria-label="${avg} out of 5">${'★'.repeat(f)}${'☆'.repeat(5 - f)}</span>`; };
+
+// Names: developers may set a studio name; otherwise show the person's own name.
+const nameSpan = (uid, fallback = 'Someone') => `<span data-uid="${esc(uid)}" data-fallback="${esc(fallback)}">${esc(fallback)}</span>`;
+async function fillNames() {
+  const els = [...document.querySelectorAll('[data-uid]')];
+  if (!els.length || !S.user) return;
+  const ids = [...new Set(els.map((e) => e.dataset.uid))];
+  const ps = await S.user.profiles(ids);
+  els.forEach((e) => { const p = ps[e.dataset.uid]; e.textContent = (p && p.name) || e.dataset.fallback; });
+}
+function devLabel(devId) {
+  const d = S.devs.get(devId);
+  if (d && d.studio) return esc(d.studio);
+  return nameSpan(devId, 'Developer');
+}
+
+// ---------- derived data ----------
+function myInstalls() {
+  if (S.personalOk && S.uid && S.installs.has(S.uid)) return S.installs.get(S.uid).apps || {};
+  if (S.personalOk && S.uid) return {};
+  return lsGet('local-installs', {});
+}
+function allApps() {
+  const installCount = {}, openCount = {}, ratings = {};
+  for (const d of S.installs.values()) for (const id of Object.keys(d.apps || {})) installCount[id] = (installCount[id] || 0) + 1;
+  for (const d of S.opens.values()) for (const [id, n] of Object.entries(d.byApp || {})) openCount[id] = (openCount[id] || 0) + (Number(n) || 0);
+  for (const [uid, d] of S.reviews) for (const [id, r] of Object.entries(d.byApp || {})) (ratings[id] = ratings[id] || []).push({ ...r, uid });
+  const mine = myInstalls();
+  const out = [];
+  for (const [devId, d] of S.devs) {
+    for (const [id, m] of Object.entries(d.apps || {})) {
+      if (!m || !m.name) continue;
+      const rs = (ratings[id] || []).filter((r) => r.rating >= 1 && r.rating <= 5 && r.uid !== devId);
+      const avg = rs.length ? Math.round((rs.reduce((a, r) => a + r.rating, 0) / rs.length) * 10) / 10 : 0;
+      out.push({ ...m, id, devId, installs: installCount[id] || 0, opens: openCount[id] || 0, reviews: rs, rating: { avg, count: rs.length }, installed: !!mine[id], isOwner: devId === S.uid });
+    }
+  }
+  return out;
+}
+const findApp = (id) => allApps().find((a) => a.id === id);
+const SORTS = {
+  popular: (a, b) => (b.installs * 10 + b.opens) - (a.installs * 10 + a.opens) || a.name.localeCompare(b.name),
+  new: (a, b) => String(b.createdAt).localeCompare(String(a.createdAt)),
+  updated: (a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)),
+  rating: (a, b) => b.rating.avg - a.rating.avg || b.rating.count - a.rating.count,
+  name: (a, b) => a.name.localeCompare(b.name),
+};
+
+// ---------- cards ----------
+function getButton(app) {
+  return app.installed
+    ? `<button class="btn get open" data-act="open" data-id="${esc(app.id)}">Open</button>`
+    : `<button class="btn get" data-act="get" data-id="${esc(app.id)}">Get</button>`;
+}
+function appCard(app) {
+  const rating = app.rating.count ? `${starsHTML(app.rating.avg)} ${app.rating.count}` : 'No ratings yet';
+  return `<div class="card" data-act="view" data-id="${esc(app.id)}" role="link" tabindex="0">
+    ${iconHTML(app.icon)}
+    <div class="info"><div class="name">${esc(app.name)}</div><div class="tag">${esc(app.tagline || app.category)}</div>
+    <div class="meta">${rating} · ${esc(app.category)}</div></div>${getButton(app)}</div>`;
+}
+const gridHTML = (apps, emptyMsg = 'No apps here yet.') => apps.length
+  ? `<div class="grid">${apps.map(appCard).join('')}</div>`
+  : `<div class="empty"><div class="big">🔍</div><p>${esc(emptyMsg)}</p></div>`;
+
+// ---------- routing (plain #name hashes only) ----------
+function parseHash() {
+  const h = location.hash.slice(1);
+  let m;
+  if (!h || h === 'discover') return { name: 'discover' };
+  if (h === 'library') return { name: 'library' };
+  if (h === 'developer') return { name: 'developer' };
+  if (h === 'publish') return { name: 'publish' };
+  if (h === 'browse') return { name: 'browse', developer: S.devFilter || '' };
+  if ((m = /^app-([a-z0-9-]+)$/.exec(h))) return { name: 'app', id: m[1] };
+  if ((m = /^edit-([a-z0-9-]+)$/.exec(h))) return { name: 'edit', id: m[1] };
+  if ((m = /^cat-([a-z]+)$/.exec(h))) return { name: 'browse', category: CATEGORIES.find((c) => c.toLowerCase() === m[1]) || '' };
+  return { name: 'discover' };
+}
+function go(hash) { if (location.hash === '#' + hash) route(); else location.hash = hash; }
+function route() {
+  if (activePlayer) activePlayer.destroy();
+  if (location.hash !== '#browse') S.devFilter = '';
+  S.route = parseHash();
+  if (S.route.name !== 'browse') S.query = '';
+  $('#searchInput').value = S.query;
+  window.scrollTo(0, 0);
+  render(true);
+}
+window.addEventListener('hashchange', route);
+$('#searchForm').onsubmit = (e) => { e.preventDefault(); S.query = $('#searchInput').value.trim(); S.devFilter = ''; go('browse'); };
+
+// Re-render on live data. Views with forms only refresh their live parts.
+function render(full) {
+  const r = S.route;
+  document.querySelectorAll('#nav a').forEach((a) => a.classList.toggle('on',
+    a.dataset.nav === (['library'].includes(r.name) ? 'library' : ['developer', 'publish', 'edit'].includes(r.name) ? 'developer' : 'discover')));
+  if (!S.db) return;
+  if (!full && (r.name === 'publish' || r.name === 'edit') && $('#f-code')) return;
+  if (!full && r.name === 'developer' && document.activeElement && document.activeElement.id === 'studio') return;
+  if (!full && r.name === 'app' && $('#reviewForm')) return refreshAppLive();
+  ({ discover: pageDiscover, browse: pageBrowse, app: pageApp, library: pageLibrary, developer: pageDev, publish: pagePublish, edit: pageEdit }[r.name] || pageDiscover)();
+  fillNames();
+}
+
+// ---------- actions ----------
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  e.preventDefault(); e.stopPropagation();
+  const id = el.dataset.id;
+  if (el.dataset.act === 'get') install(id);
+  else if (el.dataset.act === 'open') openApp(id);
+  else if (el.dataset.act === 'view') go('app-' + id);
+  else if (el.dataset.act === 'dev') { S.devFilter = id; S.query = ''; go('browse'); }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.matches('[data-act="view"]')) e.target.click();
+  if (e.key === 'Escape' && activePlayer) $('.player [data-close]').click();
+});
+
+async function setMyInstalls(apps) {
+  if (S.personalOk && S.uid) {
+    try { await write('installs/' + S.uid, (ref) => ref.set({ apps })); return; }
+    catch { S.personalOk = false; }
+  }
+  lsSet('local-installs', apps);
+  render(false);
+}
+async function install(id) {
+  const apps = { ...myInstalls(), [id]: now() };
+  if (S.personalOk && S.uid) S.installs.set(S.uid, { apps }); // show it right away
+  render(false);
+  await setMyInstalls(apps);
+  toast('Added to My Apps');
+}
+async function uninstall(id) {
+  const apps = { ...myInstalls() }; delete apps[id];
+  if (S.personalOk && S.uid) S.installs.set(S.uid, { apps });
+  render(false);
+  await setMyInstalls(apps);
+  toast('Removed from My Apps');
+}
+async function countOpen(id) {
+  if (!S.personalOk || !S.uid) return;
+  const cur = (S.opens.get(S.uid) || {}).byApp || {};
+  const byApp = { ...cur, [id]: (Number(cur[id]) || 0) + 1 };
+  try { await write('opens/' + S.uid, (ref) => ref.set({ byApp })); } catch { /* counting is best effort */ }
+}
+
+// ---------- the in-store player ----------
+// Apps run in a sandboxed frame with no origin of their own, so they can't
+// see the store or anyone's data. localStorage is provided by a small shim
+// and saved to the viewer's private storage for that app.
+function safeJSON(v) { return JSON.stringify(v).replace(/</g, '\\u003c').replace(/[\u2028\u2029]/g, (c) => '\\u' + c.charCodeAt(0).toString(16)); }
+function storageShim(snapshot) {
+  return '<script>(function(){var d=' + safeJSON(snapshot) + ',H=Object.prototype.hasOwnProperty;' +
+  'function P(){try{parent.postMessage({__appstore:"storage",data:d},"*")}catch(e){}}' +
+  'function mk(o,p){var api={getItem:function(k){k=String(k);return H.call(o,k)?o[k]:null},setItem:function(k,v){o[String(k)]=String(v);if(p)P()},removeItem:function(k){delete o[String(k)];if(p)P()},clear:function(){for(var k in o)delete o[k];if(p)P()},key:function(i){var k=Object.keys(o)[i];return k===undefined?null:k}};' +
+  'return new Proxy(api,{get:function(t,k){if(k==="length")return Object.keys(o).length;if(k in t)return t[k];if(typeof k==="symbol")return undefined;return api.getItem(k)},set:function(t,k,v){api.setItem(k,v);return true},deleteProperty:function(t,k){api.removeItem(k);return true},has:function(t,k){return k in t||H.call(o,k)},ownKeys:function(){return Object.keys(o)},getOwnPropertyDescriptor:function(t,k){if(H.call(o,k))return{value:o[k],enumerable:true,configurable:true,writable:true}}})}' +
+  'var L=mk(d,true),S=mk({},false);' +
+  'try{Object.defineProperty(window,"localStorage",{configurable:true,get:function(){return L}})}catch(e){}' +
+  'try{Object.defineProperty(window,"sessionStorage",{configurable:true,get:function(){return S}})}catch(e){}' +
+  '})();<\/script>';
+}
+function injectShim(html, snapshot) {
+  const shim = storageShim(snapshot);
+  for (const re of [/<head\b[^>]*>/i, /<html\b[^>]*>/i, /<!doctype[^>]*>/i]) {
+    const m = re.exec(html);
+    if (m) return html.slice(0, m.index + m[0].length) + shim + html.slice(m.index + m[0].length);
+  }
+  return shim + html;
+}
+
+const appDataPath = (appId) => (S.uid ? `data/users/${S.uid}/app-${appId}` : null);
+async function loadAppData(key, appId) {
+  const path = appId && appDataPath(appId);
+  if (path) {
+    try { const snap = await S.db.doc(path).get(); if (snap.exists) return { ...(snap.data().store || {}) }; }
+    catch { /* fall back to this device */ }
+  }
+  return lsGet(key, {});
+}
+function saveAppData(key, appId, data) {
+  lsSet(key, data);
+  const path = appId && appDataPath(appId);
+  if (!path) return;
+  if (JSON.stringify(data).length > 240 * 1024) { toast('This app saved a lot of data. It is kept on this device only.'); return; }
+  write(path, (ref) => ref.set({ store: data })).catch(() => {});
+}
+
+async function mountPlayer({ name, icon, html, appId, storageKey, onClose, extraButtons = '' }) {
+  if (activePlayer) activePlayer.destroy();
+  const wrap = document.createElement('div');
+  wrap.className = 'player';
+  wrap.innerHTML = `<div class="player-bar"><button class="iconbtn" data-close>‹ Back</button>
+    <div class="title">${iconHTML(icon, 'sm')}<span>${esc(name)}</span></div>${extraButtons}
+    <button class="iconbtn" data-reload title="Restart app">↻</button></div>
+    <iframe title="${esc(name)}" sandbox="allow-scripts allow-forms allow-modals allow-pointer-lock" allow="fullscreen; autoplay; gamepad" allowfullscreen></iframe>`;
+  document.body.appendChild(wrap);
+  document.body.style.overflow = 'hidden';
+  const frame = $('iframe', wrap);
+  let data = await loadAppData(storageKey, appId);
+  let timer = null, dirty = false;
+  const flush = () => { clearTimeout(timer); if (dirty) { dirty = false; saveAppData(storageKey, appId, data); } };
+  const onMessage = (e) => {
+    if (e.source !== frame.contentWindow || !e.data || e.data.__appstore !== 'storage') return;
+    if (typeof e.data.data !== 'object' || !e.data.data) return;
+    data = e.data.data; dirty = true;
+    clearTimeout(timer); timer = setTimeout(flush, 800);
+  };
+  window.addEventListener('message', onMessage);
+  window.addEventListener('pagehide', flush);
+  const load = () => { frame.srcdoc = injectShim(html, data); };
+  const handle = {
+    destroy() {
+      flush();
+      window.removeEventListener('message', onMessage);
+      window.removeEventListener('pagehide', flush);
+      wrap.remove(); document.body.style.overflow = '';
+      if (activePlayer === handle) activePlayer = null;
+    },
+  };
+  $('[data-close]', wrap).onclick = () => { handle.destroy(); onClose && onClose(); };
+  $('[data-reload]', wrap).onclick = () => { flush(); load(); };
+  load();
+  activePlayer = handle;
+  return handle;
+}
+
+async function fetchCode(app) {
+  const snap = await S.db.doc(`devs/${app.devId}/code/${app.id}`).get();
+  if (!snap.exists || typeof snap.data().html !== 'string') throw new Error('This app’s code could not be loaded.');
+  return snap.data().html;
+}
+async function openApp(id) {
+  const app = findApp(id);
+  if (!app) return toast('That app is no longer in the store');
+  let html;
+  try { html = await fetchCode(app); } catch (e) { return toast(e.message || 'Could not open this app'); }
+  const extra = app.installed ? '' : '<button class="iconbtn" data-getinplayer>Get</button>';
+  await mountPlayer({ name: app.name, icon: app.icon, html, appId: app.id, storageKey: 'appdata:' + (S.uid || 'guest') + ':' + app.id, extraButtons: extra });
+  const g = $('[data-getinplayer]');
+  if (g) g.onclick = () => { install(app.id); g.remove(); };
+  countOpen(app.id);
+}
+async function downloadApp(app) {
+  if (!S.downloads) return toast('Downloading isn’t available here');
+  try {
+    const html = await fetchCode(app);
+    await S.downloads.save({ filename: `${app.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'app'}-${app.version}.html`, data: new Blob([html], { type: 'text/html' }) });
+  } catch (e) { if (e && e.code && e.code !== 'dismissed' && e.code !== 'declined') toast('Download didn’t finish'); }
+}
+
+// ---------- pages ----------
+function pageDiscover() {
+  const apps = allApps().sort(SORTS.popular);
+  const byNew = [...apps].sort(SORTS.new);
+  const byRating = apps.filter((a) => a.rating.count).sort(SORTS.rating);
+  const f = apps[0];
+  view.innerHTML = `
+    ${f ? `<div class="hero" data-act="view" data-id="${esc(f.id)}">${iconHTML(f.icon, 'lg')}
+      <div><div class="eyebrow">Featured app</div><h1>${esc(f.name)}</h1><p>${esc(f.tagline || f.category)}</p><span class="btn">View app</span></div></div>` : ''}
+    <div class="section"><div class="chips">${CATEGORIES.map((c) => `<a class="chip" href="#cat-${c.toLowerCase()}">${esc(c)}</a>`).join('')}</div></div>
+    <div class="section"><div class="section-head"><h2>Popular</h2><button class="linkish" data-sort="popular">See all</button></div>${gridHTML(apps.slice(0, 6), S.loaded.devs ? 'No apps have been published yet. Be the first!' : 'Loading apps…')}</div>
+    ${apps.length > 1 ? `<div class="section"><div class="section-head"><h2>New arrivals</h2><button class="linkish" data-sort="new">See all</button></div>${gridHTML(byNew.slice(0, 6))}</div>` : ''}
+    ${byRating.length ? `<div class="section"><div class="section-head"><h2>Top rated</h2><button class="linkish" data-sort="rating">See all</button></div>${gridHTML(byRating.slice(0, 6))}</div>` : ''}
+    <div class="devbanner"><div><h2>Made something? Publish it here.</h2>
+      <p class="muted" style="margin:6px 0 0">Upload an HTML app and people can find it, get it, and use it right in the store.</p></div>
+      <a class="btn primary" href="#publish">Publish an app</a></div>`;
+  view.querySelectorAll('[data-sort]').forEach((b) => { b.onclick = () => { S.sort = b.dataset.sort; S.query = ''; go('browse'); }; });
+}
+
+function pageBrowse() {
+  const { category = '', developer = '' } = S.route;
+  const q = S.query;
+  let apps = allApps();
+  if (category) apps = apps.filter((a) => a.category === category);
+  if (developer) apps = apps.filter((a) => a.devId === developer);
+  if (q) {
+    const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+    apps = apps.filter((a) => {
+      const d = S.devs.get(a.devId) || {};
+      const hay = [a.name, a.tagline, a.description, a.category, d.studio].join(' ').toLowerCase();
+      return terms.every((t) => hay.includes(t));
+    });
+  }
+  apps.sort(SORTS[S.sort] || SORTS.popular);
+  let title = 'All apps';
+  if (q) title = `Results for “${esc(q)}”`;
+  else if (category) title = esc(category);
+  else if (developer) title = `Apps by ${devLabel(developer)}`;
+  view.innerHTML = `
+    <div class="section-head"><h1>${title}</h1>
+      <select class="input" id="sortSel" style="width:auto" aria-label="Sort apps">
+      ${[['popular', 'Most popular'], ['new', 'Newest'], ['updated', 'Recently updated'], ['rating', 'Top rated'], ['name', 'Name']]
+        .map(([v, l]) => `<option value="${v}" ${v === S.sort ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+    ${!q && !developer ? `<div class="chips" style="margin-bottom:16px"><a class="chip ${!category ? 'on' : ''}" href="#browse">All</a>
+      ${CATEGORIES.map((c) => `<a class="chip ${c === category ? 'on' : ''}" href="#cat-${c.toLowerCase()}">${esc(c)}</a>`).join('')}</div>` : ''}
+    <p class="muted small">${apps.length} app${apps.length === 1 ? '' : 's'}</p>
+    ${gridHTML(apps, q ? 'Nothing matched your search. Try different words.' : 'No apps here yet.')}`;
+  $('#sortSel').onchange = (e) => { S.sort = e.target.value; render(true); };
+}
+
+function appStatsHTML(app) {
+  const r = app.rating;
+  return `<div class="stat"><b>${r.count ? r.avg.toFixed(1) + ' ★' : '—'}</b><span>${r.count} rating${r.count === 1 ? '' : 's'}</span></div>
+    <div class="stat"><b>${fmtNum(app.installs)}</b><span>Downloads</span></div>
+    <div class="stat"><b>${fmtNum(app.opens)}</b><span>Opens</span></div>
+    <div class="stat"><b>${esc(app.version)}</b><span>Version</span></div>
+    <div class="stat"><b>${fmtSize(app.size || 0)}</b><span>Size</span></div>
+    <div class="stat"><b><a href="#cat-${esc(String(app.category).toLowerCase())}">${esc(app.category)}</a></b><span>Category</span></div>`;
+}
+function appActionsHTML(app) {
+  const a = [];
+  if (app.installed) {
+    a.push(`<button class="btn primary" data-act="open" data-id="${esc(app.id)}">Open</button>`);
+    a.push(`<button class="btn" id="removeBtn">Remove from My Apps</button>`);
+  } else {
+    a.push(`<button class="btn primary" data-act="get" data-id="${esc(app.id)}">Get</button>`);
+    a.push(`<button class="btn" data-act="open" data-id="${esc(app.id)}">Try it</button>`);
+  }
+  if (S.downloads) a.push(`<button class="btn" id="dlBtn">Download</button>`);
+  if (app.isOwner) a.push(`<a class="btn" href="#edit-${esc(app.id)}">Edit app</a>`);
+  return a.join('');
+}
+function reviewsHTML(app) {
+  const list = [...app.reviews].sort((x, y) => String(y.at).localeCompare(String(x.at)));
+  return list.length ? list.map((rv) => `<div class="review"><div class="review-head"><b>${rv.uid === S.uid ? 'You' : nameSpan(rv.uid)}</b>
+    <span class="muted small">${fmtDate(rv.at)}</span></div>${starsHTML(rv.rating)}${rv.text ? `<div class="desc">${esc(rv.text)}</div>` : ''}</div>`).join('')
+    : '<p class="muted">No reviews yet.</p>';
+}
+function wireAppActions(app) {
+  const rm = $('#removeBtn'); if (rm) rm.onclick = () => uninstall(app.id);
+  const dl = $('#dlBtn'); if (dl) dl.onclick = () => downloadApp(app);
+}
+function refreshAppLive() {
+  const app = findApp(S.route.id);
+  if (!app) return pageApp();
+  $('#statsBox').innerHTML = appStatsHTML(app);
+  $('#actionsBox').innerHTML = appActionsHTML(app);
+  $('#reviewsList').innerHTML = reviewsHTML(app);
+  wireAppActions(app);
+  fillNames();
+}
+
+function pageApp() {
+  const app = findApp(S.route.id);
+  if (!app) {
+    view.innerHTML = S.loaded.devs
+      ? '<div class="empty"><div class="big">🤷</div><p>That app isn’t in the store (it may have been removed).</p><a class="btn primary" href="#discover">Back to the store</a></div>'
+      : '<div class="empty"><p>Loading…</p></div>';
+    return;
+  }
+  const mine = S.uid && (S.reviews.get(S.uid) || {}).byApp ? S.reviews.get(S.uid).byApp[app.id] : (lsGet('local-reviews', {})[app.id]);
+  let reviewForm = '';
+  if (app.isOwner) reviewForm = '<p class="muted small">People’s reviews of your app show up here.</p>';
+  else if (!S.uid) reviewForm = '<p class="muted small">Sign in to claude.ai to rate and review apps.</p>';
+  else reviewForm = `<form class="form" id="reviewForm" style="margin-bottom:10px">
+      <div class="field"><label>${mine ? 'Update your review' : 'Rate this app'}</label>
+      <div class="star-pick" id="starPick">${[1, 2, 3, 4, 5].map((n) => `<button type="button" data-n="${n}" aria-label="${n} star${n > 1 ? 's' : ''}">★</button>`).join('')}</div></div>
+      <div class="field"><textarea id="reviewText" rows="3" maxlength="1000" placeholder="What did you think? (optional)">${esc(mine ? mine.text : '')}</textarea></div>
+      <div class="row"><button class="btn primary" type="submit">${mine ? 'Update review' : 'Post review'}</button>
+      ${mine ? '<button class="btn danger" type="button" id="delReview">Delete my review</button>' : ''}<span class="error" id="reviewErr"></span></div></form>`;
+  view.innerHTML = `
+    <div class="detail-head">${iconHTML(app.icon, 'lg')}
+      <div><h1>${esc(app.name)}</h1><div class="muted">${esc(app.tagline)}</div>
+      <span class="dev" data-act="dev" data-id="${esc(app.devId)}">${devLabel(app.devId)}</span>
+      <div class="detail-actions" id="actionsBox">${appActionsHTML(app)}</div></div></div>
+    <div class="stats six" id="statsBox">${appStatsHTML(app)}</div>
+    <div class="section"><div class="section-head"><h2>About this app</h2></div>
+      <div class="panel desc">${esc(app.description || 'The developer hasn’t added a description yet.')}</div></div>
+    <div class="section"><div class="section-head"><h2>What’s new</h2></div>
+      <div class="panel"><ul class="versions">${[...(app.versions || [])].reverse().map((v) => `<li><b>Version ${esc(v.version)}</b> <span class="muted small">· ${fmtDate(v.createdAt)}</span><div class="desc">${esc(v.notes)}</div></li>`).join('')}</ul></div></div>
+    <div class="section"><div class="section-head"><h2>Ratings & reviews</h2></div>
+      <div class="panel">${reviewForm}<div id="reviewsList">${reviewsHTML(app)}</div></div></div>`;
+  wireAppActions(app);
+
+  const form = $('#reviewForm');
+  if (!form) return;
+  let rating = mine ? mine.rating : 0;
+  const paint = () => form.querySelectorAll('#starPick button').forEach((b) => b.classList.toggle('on', +b.dataset.n <= rating));
+  form.querySelectorAll('#starPick button').forEach((b) => { b.onclick = () => { rating = +b.dataset.n; paint(); }; });
+  paint();
+  const saveReviews = async (byApp) => {
+    if (S.personalOk) {
+      S.reviews.set(S.uid, { byApp });
+      try { await write('reviews/' + S.uid, (ref) => ref.set({ byApp })); return true; }
+      catch { S.reviews.delete(S.uid); }
+    }
+    $('#reviewErr').textContent = 'You need Contributor access to this store to post reviews. Ask the store owner.';
+    return false;
+  };
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    if (!rating) { $('#reviewErr').textContent = 'Pick a rating from 1 to 5 stars.'; return; }
+    const byApp = { ...((S.reviews.get(S.uid) || {}).byApp || {}), [app.id]: { rating, text: $('#reviewText').value.trim().slice(0, 1000), at: now() } };
+    if (await saveReviews(byApp)) { toast('Thanks for your review!'); render(true); }
+  };
+  const del = $('#delReview');
+  if (del) del.onclick = async () => {
+    const byApp = { ...((S.reviews.get(S.uid) || {}).byApp || {}) }; delete byApp[app.id];
+    if (await saveReviews(byApp)) { toast('Review deleted'); render(true); }
+  };
+}
+
+function pageLibrary() {
+  const mine = myInstalls();
+  const apps = allApps().filter((a) => mine[a.id]).sort((a, b) => String(mine[b.id]).localeCompare(String(mine[a.id])));
+  view.innerHTML = `<div class="section-head"><h1>My Apps</h1><span class="muted small">${apps.length} app${apps.length === 1 ? '' : 's'}</span></div>
+    ${!S.personalOk ? '<p class="note">Your apps are saved on this device.</p>' : ''}
+    ${apps.length ? `<div class="panel" style="padding:24px"><div class="home-grid">${apps.map((a) => `
+      <button class="home-app" data-act="open" data-id="${esc(a.id)}" title="Open ${esc(a.name)}">${iconHTML(a.icon)}<span>${esc(a.name)}</span></button>`).join('')}</div></div>
+      <p class="muted small" style="margin-top:12px">Tap an app to open it. To remove one, open its store page.</p>`
+    : `<div class="empty"><div class="big">📱</div><p>You haven’t gotten any apps yet.</p><a class="btn primary" href="#discover">Discover apps</a></div>`}`;
+}
+
+function cannotPublishHTML() {
+  if (!S.uid) return `<div class="empty"><div class="big">🔐</div><p>Sign in to claude.ai to publish apps.</p></div>`;
+  return `<div class="empty"><div class="big">🔐</div><p>You can browse and use apps, but publishing needs Contributor or Editor access.<br>Ask the store owner to give you access from the Share menu.</p></div>`;
+}
+
+function pageDev() {
+  if (!S.uid || S.canWrite === false) { view.innerHTML = `<h1>Developer</h1>${cannotPublishHTML()}`; return; }
+  const me = S.devs.get(S.uid) || {};
+  const apps = allApps().filter((a) => a.devId === S.uid).sort(SORTS.updated);
+  const t = apps.reduce((x, a) => ({ i: x.i + a.installs, o: x.o + a.opens }), { i: 0, o: 0 });
+  view.innerHTML = `
+    <div class="section-head"><div><h1>Developer dashboard</h1><p class="muted" style="margin:4px 0 0">Publishing as <b>${me.studio ? esc(me.studio) : nameSpan(S.uid, 'you')}</b></p></div>
+      <a class="btn primary" href="#publish">+ Publish new app</a></div>
+    <form class="panel row" id="studioForm" style="margin-top:8px">
+      <div class="field" style="flex:1"><label for="studio">Developer name</label>
+      <input class="input" type="text" id="studio" maxlength="40" placeholder="Leave empty to use your own name" value="${esc(me.studio || '')}"></div>
+      <button class="btn" type="submit" style="align-self:end">Save</button></form>
+    <div class="stats" style="margin-top:16px">
+      <div class="stat"><b>${apps.length}</b><span>Apps</span></div>
+      <div class="stat"><b>${fmtNum(t.i)}</b><span>Downloads</span></div>
+      <div class="stat"><b>${fmtNum(t.o)}</b><span>Opens</span></div></div>
+    <div class="section">${apps.length ? `<div class="panel" style="padding:4px">${apps.map((a) => `
+      <div class="dev-row">${iconHTML(a.icon, 'sm')}
+        <div class="info"><b>${esc(a.name)}</b> <span class="muted small">v${esc(a.version)} · ${esc(a.category)}</span>
+        <div class="nums"><span>⬇ ${fmtNum(a.installs)}</span><span>▶ ${fmtNum(a.opens)}</span><span>★ ${a.rating.count ? a.rating.avg.toFixed(1) + ` (${a.rating.count})` : '—'}</span></div></div>
+        <a class="btn sm" href="#app-${esc(a.id)}">Store page</a><a class="btn sm primary" href="#edit-${esc(a.id)}">Edit / Update</a></div>`).join('')}</div>`
+    : `<div class="empty"><div class="big">🛠️</div><p>You haven’t published any apps yet.</p><a class="btn primary" href="#publish">Publish your first app</a></div>`}</div>
+    <div class="section"><div class="panel"><h2 style="font-size:17px">How publishing works</h2>
+      <ul class="muted" style="margin:10px 0 0;padding-left:20px">
+        <li>An app is one <b>.html</b> file with its HTML, CSS and JavaScript inside (up to 200 KB). Embed images as data URLs.</li>
+        <li>People get your app and use it right in the store. Nothing to install, no developer mode.</li>
+        <li><code>localStorage</code> works as normal and is saved privately for each person.</li>
+        <li>Apps run in a sandbox: they can’t reach people’s accounts or other apps. Outside scripts can load only from cdnjs, jsDelivr or unpkg.</li>
+        <li>Release a new version any time. Everyone gets it the next time they open your app.</li>
+      </ul></div></div>`;
+  $('#studioForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const studio = $('#studio').value.trim().slice(0, 40);
+    try { await saveDev({ ...(S.devs.get(S.uid) || { apps: {} }), studio }); toast('Saved'); render(true); }
+    catch (err) { toast(writeError(err)); }
+  };
+}
+
+function writeError(err) {
+  const c = err && err.code;
+  if (c === 'invalid_argument') return 'You don’t have permission to publish here, or the app is too large.';
+  if (c === 'quota_exceeded') return 'The store is full. Remove some apps and try again.';
+  return 'Couldn’t save. Check your connection and try again.';
+}
+async function saveDev(doc) {
+  const body = { studio: doc.studio || '', apps: doc.apps || {} };
+  if (JSON.stringify(body).length > 250 * 1024) throw { code: 'too_big' };
+  await write('devs/' + S.uid, (ref) => ref.set(body));
+  S.devs.set(S.uid, body);
+}
+
+const STARTER = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My App</title>
+  <style>
+    body { font-family: system-ui, sans-serif; display: grid; place-items: center; min-height: 100vh; margin: 0; background: #eef2ff; }
+    .box { text-align: center; }
+    button { font-size: 20px; padding: 12px 28px; border: 0; border-radius: 12px; background: #4f46e5; color: white; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>Hello from my app 👋</h1>
+    <p>You clicked <b id="count">0</b> times.</p>
+    <button id="btn">Click me</button>
+  </div>
+  <script>
+    // localStorage works inside the store and is saved for each person.
+    let count = Number(localStorage.getItem('clicks')) || 0;
+    const el = document.getElementById('count');
+    el.textContent = count;
+    document.getElementById('btn').onclick = () => {
+      count++;
+      el.textContent = count;
+      localStorage.setItem('clicks', count);
+    };
+  <\/script>
+</body>
+</html>
+`;
+const bumpVersion = (v) => { const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(v || ''); return m ? `${m[1]}.${m[2]}.${+m[3] + 1}` : ''; };
+
+function listingFields(app = {}) {
+  const icon = app.icon || { type: 'emoji', emoji: '✨', bg: '#6366f1' };
+  return `
+    <div class="field"><label for="f-name">App name</label><input type="text" id="f-name" maxlength="40" required value="${esc(app.name)}"></div>
+    <div class="field"><label for="f-tag">Tagline</label><input type="text" id="f-tag" maxlength="80" placeholder="One short line about your app" value="${esc(app.tagline)}"></div>
+    <div class="field"><label for="f-cat">Category</label><select id="f-cat">${CATEGORIES.map((c) => `<option ${c === app.category ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+    <div class="field"><label>Icon</label><div class="icon-edit"><div id="iconPreview">${iconHTML(icon)}</div>
+      <input type="text" class="input emoji-in" id="f-emoji" maxlength="16" value="${esc(icon.type === 'emoji' ? icon.emoji : '✨')}" aria-label="Icon emoji">
+      <input type="color" id="f-bg" value="${esc(icon.bg)}" aria-label="Icon background color">
+      <label class="btn sm">Upload image<input type="file" id="f-iconfile" accept="image/png,image/jpeg,image/webp,image/gif" hidden></label></div>
+      <span class="hint">Type an emoji and pick a background color, or upload a square image.</span></div>
+    <div class="field"><label for="f-desc">Description</label><textarea id="f-desc" rows="5" maxlength="4000" placeholder="What does your app do? Who is it for?">${esc(app.description)}</textarea></div>`;
+}
+function shrinkImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas'); c.width = c.height = 128;
+      const s = Math.min(img.width, img.height);
+      c.getContext('2d').drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, 128, 128);
+      let d = c.toDataURL('image/png'); if (d.length > 40 * 1024) d = c.toDataURL('image/jpeg', 0.85);
+      URL.revokeObjectURL(img.src); resolve(d);
+    };
+    img.onerror = reject; img.src = URL.createObjectURL(file);
+  });
+}
+function wireListing(root, initialIcon) {
+  let icon = initialIcon || { type: 'emoji', emoji: '✨', bg: '#6366f1' };
+  const redraw = () => { $('#iconPreview', root).innerHTML = iconHTML(icon); };
+  $('#f-emoji', root).oninput = (e) => { icon = { type: 'emoji', emoji: e.target.value || '✨', bg: icon.bg }; redraw(); };
+  $('#f-bg', root).oninput = (e) => { icon = { ...icon, bg: e.target.value }; redraw(); };
+  $('#f-iconfile', root).onchange = async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    try { icon = { type: 'image', data: await shrinkImage(f), bg: icon.bg }; redraw(); } catch { toast('Couldn’t read that image'); }
+  };
+  return () => ({ name: $('#f-name', root).value.trim(), tagline: $('#f-tag', root).value.trim(), category: $('#f-cat', root).value,
+    description: $('#f-desc', root).value.trim(), icon });
+}
+function codeFields({ version = '1.0.0', html = '', isUpdate = false } = {}) {
+  return `<div class="row">
+      <div class="field" style="max-width:180px"><label for="f-ver">Version</label><input type="text" id="f-ver" maxlength="20" value="${esc(version)}" required></div>
+      <div class="field"><label for="f-notes">${isUpdate ? 'What’s new in this version' : 'Release notes'}</label><input type="text" id="f-notes" maxlength="1000" placeholder="${isUpdate ? 'Bug fixes and improvements' : 'First release'}"></div></div>
+    <div class="field"><label for="f-code">App code (HTML)</label>
+      <div class="row"><label class="btn sm">Upload .html file<input type="file" id="f-file" accept=".html,.htm,text/html" hidden></label>
+        ${isUpdate ? '' : '<button type="button" class="btn sm" id="f-starter">Use starter template</button>'}
+        <button type="button" class="btn sm" id="f-preview">▶ Preview</button><span class="muted small" id="f-size"></span></div>
+      <textarea class="code" id="f-code" spellcheck="false" placeholder="Paste your app’s HTML here, or upload a file.">${esc(html)}</textarea>
+      <span class="hint">Your whole app in one HTML file (inline CSS and JS). Max 200 KB.</span></div>`;
+}
+function wireCode(root, getMeta) {
+  const ta = $('#f-code', root);
+  const size = () => { const n = new Blob([ta.value]).size; $('#f-size', root).textContent = ta.value ? fmtSize(n) + (n > MAX_CODE ? ' (too large)' : '') : ''; };
+  ta.oninput = size;
+  ta.onkeydown = (e) => { if (e.key === 'Tab') { e.preventDefault(); ta.setRangeText('  ', ta.selectionStart, ta.selectionEnd, 'end'); } };
+  $('#f-file', root).onchange = async (e) => { const f = e.target.files[0]; if (!f) return; ta.value = await f.text(); size(); toast(`Loaded ${f.name}`); };
+  const st = $('#f-starter', root);
+  if (st) st.onclick = () => { ta.value = STARTER; size(); };
+  $('#f-preview', root).onclick = () => {
+    if (!ta.value.trim()) return toast('Add some code first');
+    const m = getMeta();
+    mountPlayer({ name: `Preview · ${m.name || 'Untitled'}`, icon: m.icon, html: ta.value, appId: null, storageKey: 'appdata:preview' });
+  };
+  size();
+}
+function validate(meta, needCode) {
+  if (!meta.name) return 'Give your app a name.';
+  if (allApps().some((a) => a.id !== meta.id && a.name.toLowerCase() === meta.name.toLowerCase())) return 'An app with that name already exists. Pick another name.';
+  if (needCode) {
+    if (!/^[0-9A-Za-z][0-9A-Za-z.+-]{0,19}$/.test(meta.version || '')) return 'Use a version like 1.0.0 (letters, numbers, dots and dashes).';
+    if (!meta.html.trim()) return 'Add your app’s code: upload a file, paste it, or use the starter template.';
+    if (new Blob([meta.html]).size > MAX_CODE) return 'Your app is over 200 KB. Make it smaller and try again.';
+  }
+  return '';
+}
+
+function pagePublish() {
+  if (!S.uid || S.canWrite === false) { view.innerHTML = `<h1>Publish an app</h1>${cannotPublishHTML()}`; return; }
+  view.innerHTML = `<a href="#developer" class="muted">‹ Developer dashboard</a>
+    <h1 style="margin:8px 0 18px">Publish a new app</h1>
+    <form class="form" id="newForm"><div class="panel form">${listingFields()}</div><div class="panel form">${codeFields()}</div>
+      <div class="row"><button class="btn primary" type="submit" id="pubBtn">Publish to store</button><span class="error" id="formErr"></span></div></form>`;
+  const form = $('#newForm');
+  const getMeta = wireListing(form);
+  wireCode(form, getMeta);
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const id = newId();
+    const meta = { ...getMeta(), id, version: $('#f-ver').value.trim(), html: $('#f-code').value };
+    const err = validate(meta, true);
+    if (err) { $('#formErr').textContent = err; return; }
+    $('#pubBtn').disabled = true; $('#formErr').textContent = '';
+    const t = now();
+    const entry = { name: meta.name, tagline: meta.tagline, description: meta.description, category: meta.category, icon: meta.icon,
+      version: meta.version, size: new Blob([meta.html]).size, createdAt: t, updatedAt: t,
+      versions: [{ version: meta.version, notes: $('#f-notes').value.trim() || 'First release', createdAt: t }] };
+    try {
+      await write(`devs/${S.uid}/code/${id}`, (ref) => ref.set({ html: meta.html, version: meta.version }));
+      const dev = S.devs.get(S.uid) || { studio: '', apps: {} };
+      await saveDev({ ...dev, apps: { ...dev.apps, [id]: entry } });
+      toast(`${meta.name} is live in the store!`);
+      go('app-' + id);
+    } catch (er) {
+      $('#formErr').textContent = er && er.code === 'too_big' ? 'Your apps’ icons take too much space. Use emoji icons or smaller images.' : writeError(er);
+      $('#pubBtn').disabled = false;
+    }
+  };
+}
+
+async function pageEdit() {
+  const app = findApp(S.route.id);
+  if (!app || !app.isOwner) { view.innerHTML = '<div class="empty"><p>Only the developer of this app can edit it.</p><a class="btn primary" href="#developer">Developer dashboard</a></div>'; return; }
+  view.innerHTML = '<div class="empty"><p>Loading your app…</p></div>';
+  let html = '';
+  try { html = await fetchCode(app); } catch { /* start empty */ }
+  if (S.route.name !== 'edit' || S.route.id !== app.id) return;
+  view.innerHTML = `<a href="#developer" class="muted">‹ Developer dashboard</a>
+    <div class="row" style="margin:8px 0 18px">${iconHTML(app.icon, 'sm')}<h1>${esc(app.name)}</h1><span class="muted">v${esc(app.version)}</span>
+      <a class="btn sm" href="#app-${esc(app.id)}" style="margin-left:auto">View in store</a></div>
+    <div class="section-head"><h2>Store listing</h2></div>
+    <form class="panel form" id="listingForm">${listingFields(app)}<div class="row"><button class="btn primary" type="submit">Save listing</button><span class="error" id="listErr"></span></div></form>
+    <div class="section"><div class="section-head"><h2>Release a new version</h2></div>
+    <form class="panel form" id="codeForm"><p class="muted" style="margin:0">Edit your code below (it starts as version ${esc(app.version)}) or upload a new file, then publish the update.</p>
+      ${codeFields({ version: bumpVersion(app.version), html, isUpdate: true })}
+      <div class="row"><button class="btn primary" type="submit" id="relBtn">Publish update</button><span class="error" id="codeErr"></span></div></form></div>
+    <div class="section"><div class="section-head"><h2>Remove from store</h2></div>
+    <div class="panel row"><div style="flex:1;min-width:200px">Remove this app for everyone. This can’t be undone.</div>
+      <button class="btn danger" id="delApp">Delete app</button></div></div>`;
+  const lf = $('#listingForm');
+  const getMeta = wireListing(lf, app.icon);
+  const entryOf = () => ({ ...(S.devs.get(S.uid).apps[app.id]) });
+  lf.onsubmit = async (e) => {
+    e.preventDefault();
+    const m = getMeta(); const err = validate({ ...m, id: app.id }, false);
+    if (err) { $('#listErr').textContent = err; return; }
+    const dev = S.devs.get(S.uid);
+    try { await saveDev({ ...dev, apps: { ...dev.apps, [app.id]: { ...entryOf(), ...m, updatedAt: now() } } }); toast('Listing saved'); $('#listErr').textContent = ''; }
+    catch (er) { $('#listErr').textContent = writeError(er); }
+  };
+  const cf = $('#codeForm');
+  wireCode(cf, getMeta);
+  cf.onsubmit = async (e) => {
+    e.preventDefault();
+    const version = $('#f-ver').value.trim(), code = $('#f-code').value;
+    let err = validate({ name: app.name, id: app.id, version, html: code }, true);
+    const cur = entryOf();
+    if (!err && (cur.versions || []).some((v) => v.version === version)) err = `Version ${version} already exists. Use a new version number.`;
+    if (err) { $('#codeErr').textContent = err; return; }
+    $('#relBtn').disabled = true;
+    const t = now();
+    try {
+      await write(`devs/${S.uid}/code/${app.id}`, (ref) => ref.set({ html: code, version }));
+      const versions = [...(cur.versions || []), { version, notes: $('#f-notes').value.trim() || 'Bug fixes and improvements', createdAt: t }].slice(-30);
+      const dev = S.devs.get(S.uid);
+      await saveDev({ ...dev, apps: { ...dev.apps, [app.id]: { ...cur, version, versions, size: new Blob([code]).size, updatedAt: t } } });
+      toast(`Version ${version} is live!`);
+      render(true);
+    } catch (er) { $('#codeErr').textContent = writeError(er); $('#relBtn').disabled = false; }
+  };
+  const del = $('#delApp');
+  del.onclick = async () => {
+    if (!del.dataset.armed) { del.dataset.armed = '1'; del.textContent = 'Tap again to delete'; setTimeout(() => { delete del.dataset.armed; del.textContent = 'Delete app'; }, 4000); return; }
+    const dev = S.devs.get(S.uid); const apps = { ...dev.apps }; delete apps[app.id];
+    try {
+      await saveDev({ ...dev, apps });
+      await write(`devs/${S.uid}/code/${app.id}`, (ref) => ref.delete());
+      toast('App deleted'); go('developer');
+    } catch (er) { toast(writeError(er)); }
+  };
+}
+
+// ---------- boot ----------
+function subscribe(coll, map, key) {
+  S.db.collection(coll).onSnapshot((snap) => {
+    map.clear();
+    snap.docs.forEach((d) => { if (d.exists) map.set(d.id, d.data()); });
+    if (key && !snap.metadata.fromCache) S.loaded[key] = true;
+    if (key) S.loaded[key + 'Any'] = true;
+    render(false);
+  }, () => { if (key) { S.loaded[key] = true; render(false); } });
+}
+
+(async function boot() {
+  render(true);
+  const C = window.claude;
+  const [db, user, downloads] = C ? await Promise.all([C.use('db'), C.use('user'), C.use('downloads')]) : [null, null, null];
+  S.user = user; S.downloads = downloads;
+  if (!db) {
+    view.innerHTML = '<div class="empty"><div class="big">🔐</div><p>Sign in to claude.ai to open the App Store.</p></div>';
+    render(false);
+    return;
+  }
+  S.db = db;
+  if (user) {
+    const [me, can] = await Promise.all([user.me(), user.can('data.write')]);
+    S.me = me; S.uid = me.id; S.canWrite = can;
+    if (!S.uid || can === false) S.personalOk = false;
+    if (S.uid) $('#who').innerHTML = `<img src="${esc(me.avatarUrl)}" alt=""><span></span>`;
+    if (S.uid) $('#who span').textContent = me.name || 'You';
+  } else S.personalOk = false;
+  subscribe('devs', S.devs, 'devs');
+  subscribe('installs', S.installs);
+  subscribe('reviews', S.reviews);
+  subscribe('opens', S.opens);
+  setTimeout(() => {
+    if (!S.loaded.devsAny) view.innerHTML = '<div class="empty"><div class="big">📡</div><p>The store can’t be reached right now. Check your connection.</p></div>';
+  }, 10000);
+  route();
+})();
+</script>
