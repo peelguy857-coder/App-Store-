@@ -1,0 +1,31 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Focus Timer</title>
+<style>
+  html,body{margin:0;height:100%}
+  body{font-family:system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:background .4s;color:#fff}
+  body.work{background:#e11d48}body.break{background:#059669}
+  .modes{display:flex;gap:8px}
+  .modes button{background:#ffffff30}.modes button.on{background:#fff;color:#111}
+  #t{font-size:min(28vw,140px);font-weight:700;font-variant-numeric:tabular-nums}
+  button{font:inherit;font-size:18px;border:0;border-radius:999px;padding:12px 26px;cursor:pointer;color:#fff}
+  #go{background:#fff;color:#111;font-size:22px;padding:14px 48px}
+  p{opacity:.85;margin:0}
+</style></head><body class="work">
+<div class="modes"><button data-m="work" class="on">Focus · 25</button><button data-m="short">Break · 5</button><button data-m="long">Long · 15</button></div>
+<div id="t">25:00</div>
+<div><button id="go">Start</button> <button id="reset" style="background:#ffffff30">Reset</button></div>
+<p id="done"></p>
+<script>
+const mins={work:25,short:5,long:15};let mode='work',left=mins.work*60,timer=null,end=0;
+let sessions=+localStorage.getItem('focus-sessions')||0;
+const t=document.getElementById('t'),go=document.getElementById('go'),done=document.getElementById('done');
+const show=()=>{const s=Math.max(0,Math.round(left));t.textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');document.title=t.textContent+' · Focus Timer';done.textContent='Focus sessions completed: '+sessions};
+function beep(){try{const a=new AudioContext(),o=a.createOscillator();o.connect(a.destination);o.frequency.value=880;o.start();o.stop(a.currentTime+.4)}catch{}}
+function tick(){left=(end-Date.now())/1000;if(left<=0){stop();beep();if(mode==='work'){sessions++;localStorage.setItem('focus-sessions',sessions)}setMode(mode==='work'?'short':'work')}show()}
+function start(){end=Date.now()+left*1000;timer=setInterval(tick,250);go.textContent='Pause'}
+function stop(){clearInterval(timer);timer=null;go.textContent='Start'}
+function setMode(m){stop();mode=m;left=mins[m]*60;document.body.className=m==='work'?'work':'break';document.querySelectorAll('.modes button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));show()}
+go.onclick=()=>timer?stop():start();document.getElementById('reset').onclick=()=>setMode(mode);
+document.querySelectorAll('.modes button').forEach(b=>b.onclick=()=>setMode(b.dataset.m));show();
+</script></body></html>

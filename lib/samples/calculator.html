@@ -1,0 +1,39 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Calculator</title>
+<style>
+  *{box-sizing:border-box}html,body{margin:0;height:100%}
+  body{font-family:system-ui,sans-serif;background:#111827;color:#f9fafb;display:flex;align-items:center;justify-content:center}
+  .calc{width:min(340px,94vw);background:#1f2937;border-radius:24px;padding:18px;box-shadow:0 20px 50px #0007}
+  .screen{text-align:right;padding:12px 8px 18px;min-height:96px}
+  .expr{color:#9ca3af;font-size:16px;min-height:20px;word-break:break-all}
+  .out{font-size:44px;font-weight:300;word-break:break-all}
+  .keys{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  button{font:inherit;font-size:22px;border:0;border-radius:16px;padding:16px 0;background:#374151;color:inherit;cursor:pointer}
+  button:active{filter:brightness(1.3)}
+  .op{background:#f59e0b;color:#111}.fn{background:#4b5563}.wide{grid-column:span 2}
+</style></head><body>
+<div class="calc">
+  <div class="screen"><div class="expr" id="expr"></div><div class="out" id="out">0</div></div>
+  <div class="keys" id="keys"></div>
+</div>
+<script>
+const layout=[['C','fn'],['±','fn'],['%','fn'],['÷','op'],['7'],['8'],['9'],['×','op'],['4'],['5'],['6'],['−','op'],['1'],['2'],['3'],['+','op'],['0','wide'],['.'],['=','op']];
+const keys=document.getElementById('keys'),out=document.getElementById('out'),exprEl=document.getElementById('expr');
+let cur='0',prev=null,op=null,fresh=false;
+const fmt=n=>{if(!isFinite(n))return'Error';const s=String(+n.toPrecision(12));return s};
+const calc=(a,b,o)=>({'+':a+b,'−':a-b,'×':a*b,'÷':b===0?NaN:a/b})[o];
+function press(k){
+  if(/\d/.test(k)){cur=(cur==='0'||fresh)?k:cur+k;fresh=false}
+  else if(k==='.'){if(fresh){cur='0';fresh=false}if(!cur.includes('.'))cur+='.'}
+  else if(k==='C'){cur='0';prev=null;op=null}
+  else if(k==='±'){cur=fmt(-parseFloat(cur))}
+  else if(k==='%'){cur=fmt(parseFloat(cur)/100)}
+  else if(k==='='){if(op!==null){cur=fmt(calc(prev,parseFloat(cur),op));prev=null;op=null;fresh=true}}
+  else{if(op!==null&&!fresh)cur=fmt(calc(prev,parseFloat(cur),op));prev=parseFloat(cur);op=k;fresh=true}
+  out.textContent=cur;exprEl.textContent=op?fmt(prev)+' '+op:'';
+}
+for(const [k,c] of layout){const b=document.createElement('button');b.textContent=k;if(c)b.className=c;b.onclick=()=>press(k);keys.appendChild(b)}
+const map={'*':'×','/':'÷','-':'−','+':'+','Enter':'=','=':'=','Escape':'C','.':'.','%':'%'};
+addEventListener('keydown',e=>{if(/^\d$/.test(e.key))press(e.key);else if(map[e.key])press(map[e.key]);else if(e.key==='Backspace'){cur=cur.length>1?cur.slice(0,-1):'0';out.textContent=cur}});
+</script></body></html>

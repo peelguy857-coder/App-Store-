@@ -1,0 +1,35 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pixel Paint</title>
+<style>
+  *{box-sizing:border-box}html,body{margin:0;height:100%}
+  body{font-family:system-ui,sans-serif;background:#f1f5f9;display:flex;flex-direction:column;align-items:center;gap:12px;padding:12px}
+  .bar{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center}
+  .sw{width:30px;height:30px;border-radius:8px;border:3px solid transparent;cursor:pointer}
+  .sw.on{border-color:#0f172a}
+  button,input[type=color]{font:inherit;border:0;border-radius:8px;padding:6px 12px;background:#0f172a;color:#fff;cursor:pointer}
+  input[type=color]{padding:0;width:36px;height:30px;background:none}
+  #grid{display:grid;touch-action:none;background:#fff;box-shadow:0 4px 20px #0002;width:min(92vw,calc(100vh - 140px));aspect-ratio:1}
+  #grid div{border:1px solid #e2e8f0}
+</style></head><body>
+<div class="bar" id="pal"></div>
+<div id="grid"></div>
+<div class="bar"><button id="erase">Eraser</button><button id="fill">Fill all</button><button id="clear">Clear</button><button id="png">Save PNG</button></div>
+<script>
+const N=16,colors=['#0f172a','#ef4444','#f97316','#facc15','#22c55e','#06b6d4','#3b82f6','#a855f7','#ec4899','#ffffff'];
+let color=colors[1],down=false;
+let px=JSON.parse(localStorage.getItem('pixels')||'null')||Array(N*N).fill('#ffffff');
+const grid=document.getElementById('grid'),pal=document.getElementById('pal');
+grid.style.gridTemplateColumns=`repeat(${N},1fr)`;
+const save=()=>localStorage.setItem('pixels',JSON.stringify(px));
+const cells=px.map((c,i)=>{const d=document.createElement('div');d.style.background=c;d.dataset.i=i;grid.append(d);return d});
+function paint(e){const el=document.elementFromPoint(e.clientX,e.clientY);if(el&&el.dataset.i!=null){px[el.dataset.i]=color;el.style.background=color;save()}}
+grid.onpointerdown=e=>{down=true;paint(e)};addEventListener('pointerup',()=>down=false);grid.onpointermove=e=>{if(down)paint(e)};
+function pick(c,el){color=c;pal.querySelectorAll('.sw').forEach(s=>s.classList.remove('on'));el&&el.classList.add('on')}
+colors.forEach(c=>{const s=document.createElement('div');s.className='sw'+(c===color?' on':'');s.style.background=c;s.onclick=()=>pick(c,s);pal.append(s)});
+const custom=document.createElement('input');custom.type='color';custom.oninput=()=>pick(custom.value);pal.append(custom);
+document.getElementById('erase').onclick=()=>pick('#ffffff');
+document.getElementById('fill').onclick=()=>{px.fill(color);cells.forEach(c=>c.style.background=color);save()};
+document.getElementById('clear').onclick=()=>{px.fill('#ffffff');cells.forEach(c=>c.style.background='#ffffff');save()};
+document.getElementById('png').onclick=()=>{const k=document.createElement('canvas');k.width=k.height=N*20;const g=k.getContext('2d');px.forEach((c,i)=>{g.fillStyle=c;g.fillRect(i%N*20,Math.floor(i/N)*20,20,20)});const a=document.createElement('a');a.download='pixel-art.png';a.href=k.toDataURL();a.click()};
+</script></body></html>

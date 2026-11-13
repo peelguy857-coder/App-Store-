@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>App Store</title>
+  <meta name="description" content="Find, install and use apps right in your browser — or publish your own.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%232563eb'/><text x='50' y='68' font-size='56' text-anchor='middle' fill='white'>A</text></svg>">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#/"><span class="brand-mark">A</span>App Store</a>
+      <form class="search" id="searchForm" role="search">
+        <input id="searchInput" type="search" placeholder="Search apps, games, developers" aria-label="Search apps">
+      </form>
+      <nav class="nav" id="nav">
+        <a href="#/" data-nav="discover"><span class="ico">🧭</span>Discover</a>
+        <a href="#/library" data-nav="library"><span class="ico">📱</span>My Apps</a>
+        <a href="#/dev" data-nav="dev"><span class="ico">🛠️</span>Developer</a>
+        <a href="#/account" data-nav="account" id="accountLink"><span class="ico">👤</span><span id="accountLabel">Sign in</span></a>
+      </nav>
+    </div>
+  </header>
+  <main class="page" id="view"></main>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

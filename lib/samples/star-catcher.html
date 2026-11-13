@@ -1,0 +1,49 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Star Catcher</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b1026;overflow:hidden;font-family:system-ui,sans-serif;color:#fff;touch-action:none}
+  canvas{display:block;width:100%;height:100%}
+  #hud{position:fixed;top:10px;left:14px;right:14px;display:flex;justify-content:space-between;font-weight:600;pointer-events:none}
+  #msg{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px;background:#0b1026cc}
+  #msg h1{margin:0;font-size:40px}#msg button{font:inherit;font-size:18px;padding:12px 28px;border:0;border-radius:999px;background:#facc15;color:#111;cursor:pointer;margin-top:10px}
+</style></head><body>
+<canvas id="c"></canvas>
+<div id="hud"><span id="score">Score 0</span><span id="lives">♥♥♥</span><span id="best">Best 0</span></div>
+<div id="msg"><h1>⭐ Star Catcher</h1><p>Move with your mouse, finger or ← → keys.<br>Catch stars, dodge the rocks!</p><button id="go">Play</button></div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+let W,H;const fit=()=>{W=c.width=innerWidth*devicePixelRatio;H=c.height=innerHeight*devicePixelRatio};fit();addEventListener('resize',fit);
+const S=()=>devicePixelRatio;
+let best=+localStorage.getItem('star-best')||0;document.getElementById('best').textContent='Best '+best;
+let px,items,score,lives,speed,running=false,keys={},last=0,spawn=0;
+const sky=Array.from({length:80},()=>({x:Math.random(),y:Math.random(),r:Math.random()*1.5+.3}));
+function reset(){px=W/2;items=[];score=0;lives=3;speed=1;spawn=0;hud()}
+function hud(){document.getElementById('score').textContent='Score '+score;document.getElementById('lives').textContent='♥'.repeat(lives)||'—'}
+addEventListener('pointermove',e=>{px=e.clientX*S()});addEventListener('pointerdown',e=>{px=e.clientX*S()});
+addEventListener('keydown',e=>keys[e.key]=true);addEventListener('keyup',e=>keys[e.key]=false);
+function star(ctx,cx,cy,r){ctx.beginPath();for(let i=0;i<10;i++){const a=Math.PI/5*i-Math.PI/2,rr=i%2?r/2.3:r;ctx.lineTo(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr)}ctx.closePath();ctx.fill()}
+function loop(t){
+  const dt=Math.min(50,t-last)/16.67;last=t;
+  x.fillStyle='#0b1026';x.fillRect(0,0,W,H);
+  x.fillStyle='#ffffff88';for(const s of sky){x.beginPath();x.arc(s.x*W,s.y*H,s.r*S(),0,7);x.fill()}
+  const pw=110*S(),ph=16*S(),py=H-50*S();
+  if(running){
+    if(keys.ArrowLeft)px-=12*S()*dt;if(keys.ArrowRight)px+=12*S()*dt;
+    px=Math.max(pw/2,Math.min(W-pw/2,px));
+    spawn-=dt;if(spawn<=0){spawn=Math.max(14,40-speed*6);items.push({x:Math.random()*(W-40*S())+20*S(),y:-20*S(),rock:Math.random()<.28+speed*.02,v:(2.5+Math.random()*2)*speed*S(),r:(14+Math.random()*6)*S()})}
+    speed+=.0008*dt;
+    for(const it of items){it.y+=it.v*dt;
+      if(it.y>py-it.r&&it.y<py+ph&&Math.abs(it.x-px)<pw/2+it.r*.5){it.dead=true;if(it.rock){lives--;hud();if(!lives)end()}else{score++;hud()}}
+      else if(it.y>H+30*S())it.dead=true}
+    items=items.filter(i=>!i.dead);
+  }
+  for(const it of items){if(it.rock){x.fillStyle='#78716c';x.beginPath();x.arc(it.x,it.y,it.r*.9,0,7);x.fill()}else{x.fillStyle='#facc15';star(x,it.x,it.y,it.r)}}
+  x.fillStyle='#38bdf8';x.beginPath();x.roundRect(px-pw/2,py,pw,ph,ph/2);x.fill();
+  requestAnimationFrame(loop);
+}
+function end(){running=false;if(score>best){best=score;localStorage.setItem('star-best',best);document.getElementById('best').textContent='Best '+best}
+  const m=document.getElementById('msg');m.querySelector('h1').textContent='Game over';m.querySelector('p').textContent='You caught '+score+' stars.';m.querySelector('button').textContent='Play again';m.style.display='flex'}
+document.getElementById('go').onclick=()=>{reset();running=true;document.getElementById('msg').style.display='none'};
+reset();requestAnimationFrame(loop);
+</script></body></html>
