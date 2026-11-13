@@ -14,7 +14,10 @@ const CATEGORIES = ['Games', 'Productivity', 'Utilities', 'Education', 'Creativi
 const MAX_HTML = 2 * 1024 * 1024;      // 2 MB of app code per version
 const MAX_ICON = 300 * 1024;           // 300 KB icon image (data URL)
 const MAX_BODY = 3 * 1024 * 1024;
-const SESSION_DAYS = 30;
+const SESSION_DAYS = 60;               // stay signed in for 60 days, renewed while in use
+const SHORT_SESSION_HOURS = 12;        // when "keep me signed in" is off
+const LOGIN_WINDOW_MS = 15 * 60 * 1000; // failed sign-in limit window
+const LOGIN_MAX_FAILS = 10;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
 // Apps run with an opaque origin, so they can never touch the store's
@@ -125,10 +128,11 @@ function slugify(name) {
 
 // ---------- the app ----------
 
-function createApp({ dataDir = path.join(__dirname, 'data'), seedSamples = true } = {}) {
-  const db = new DB(dataDir);
+async function createApp({ dataDir = path.join(__dirname, 'data'), databaseUrl = '', seedSamples = true } = {}) {
+  const db = await DB.open({ dataDir, databaseUrl });
   const D = db.data;
-  if (seedSamples) seed(db, { newId, now });
+  if (seedSamples) await seed(db, { newId, now });
+  const loginFails = new Map(); // "ip|username" -> { count, first }
 
   function currentUser(req) {
     const sid = parseCookies(req.headers.cookie).sid;
@@ -138,21 +142,65 @@ function createApp({ dataDir = path.join(__dirname, 'data'), seedSamples = true 
     return D.users[s.userId] || null;
   }
 
+  const isHttps = (req) => req.headers['x-forwarded-proto'] === 'https' || !!req.socket.encrypted;
+  function sessionCookie(req, sid, maxAgeSec) {
+    const age = maxAgeSec == null ? '' : `; Max-Age=${maxAgeSec}`;
+    return `sid=${sid}; HttpOnly; SameSite=Lax; Path=/${age}${isHttps(req) ? '; Secure' : ''}`;
+  }
+
+  // Keep remembered sign-ins alive while people use the store.
+  function renewSession(req, res) {
+    const sid = parseCookies(req.headers.cookie).sid;
+    const s = sid && D.sessions[sid];
+    if (!s || !s.remember || Date.parse(s.expires) < Date.now()) return;
+    if (Date.now() - Date.parse(s.renewed || s.created || 0) < 864e5) return;
+    s.renewed = now();
+    s.expires = new Date(Date.now() + SESSION_DAYS * 864e5).toISOString();
+    db.save();
+    res.setHeader('Set-Cookie', sessionCookie(req, sid, SESSION_DAYS * 86400));
+  }
+
+  function clientIp(req) {
+    return String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '';
+  }
+  function checkLoginLimit(key) {
+    const f = loginFails.get(key);
+    if (f && Date.now() - f.first < LOGIN_WINDOW_MS && f.count >= LOGIN_MAX_FAILS) {
+      throw new HttpError(429, 'Too many wrong passwords. Wait 15 minutes and try again.');
+    }
+  }
+  function noteLoginFail(key) {
+    const f = loginFails.get(key);
+    if (!f || Date.now() - f.first >= LOGIN_WINDOW_MS) loginFails.set(key, { count: 1, first: Date.now() });
+    else f.count++;
+    if (loginFails.size > 10000) loginFails.clear();
+  }
+
+  function validPassword(pw) {
+    const password = typeof pw === 'string' ? pw : '';
+    if (password.length < 8) throw new HttpError(400, 'Password must be at least 8 characters');
+    if (password.length > 200) throw new HttpError(400, 'Password is too long');
+    if (/^\s|\s$/.test(password)) throw new HttpError(400, 'Password can’t start or end with a space');
+    return password;
+  }
+
   function requireUser(req) {
     const u = currentUser(req);
     if (!u) throw new HttpError(401, 'Please sign in first');
     return u;
   }
 
-  function startSession(res, user) {
+  function startSession(req, res, user, remember = true) {
     const sid = crypto.randomBytes(32).toString('hex');
-    const expires = new Date(Date.now() + SESSION_DAYS * 864e5).toISOString();
-    D.sessions[sid] = { userId: user.id, expires };
+    const ms = remember ? SESSION_DAYS * 864e5 : SHORT_SESSION_HOURS * 3600e3;
+    D.sessions[sid] = { userId: user.id, created: now(), renewed: now(), expires: new Date(Date.now() + ms).toISOString(), remember: !!remember };
+    // Drop this person's expired sessions while we're here.
+    for (const [k, s] of Object.entries(D.sessions)) if (Date.parse(s.expires) < Date.now()) delete D.sessions[k];
     db.save();
-    res.setHeader('Set-Cookie', `sid=${sid}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_DAYS * 86400}`);
+    res.setHeader('Set-Cookie', sessionCookie(req, sid, remember ? SESSION_DAYS * 86400 : null));
   }
 
-  const publicUser = (u) => u && ({ id: u.id, username: u.username, displayName: u.displayName });
+  const publicUser = (u) => u && ({ id: u.id, username: u.username, displayName: u.displayName, createdAt: u.createdAt });
 
   function rating(appId) {
     const list = D.reviews[appId] || [];
@@ -238,31 +286,36 @@ function createApp({ dataDir = path.join(__dirname, 'data'), seedSamples = true 
     const body = await readBody(req);
     const username = str(body.username, 'Username', { min: 3, max: 24 }).toLowerCase();
     if (!/^[a-z0-9_]+$/.test(username)) throw new HttpError(400, 'Username may only use letters, numbers and _');
-    const password = typeof body.password === 'string' ? body.password : '';
-    if (password.length < 6) throw new HttpError(400, 'Password must be at least 6 characters');
-    if (password.length > 200) throw new HttpError(400, 'Password is too long');
+    const password = validPassword(body.password);
+    if (password.toLowerCase() === username) throw new HttpError(400, 'Pick a password that isn’t your username');
     if (Object.values(D.users).some((u) => u.username === username)) throw new HttpError(409, 'That username is taken');
     const displayName = str(body.displayName || username, 'Display name', { min: 1, max: 40 });
     const { salt, hash } = hashPassword(password);
     const user = { id: newId(), username, displayName, salt, passHash: hash, createdAt: now() };
     D.users[user.id] = user;
-    startSession(res, user);
+    startSession(req, res, user, body.remember !== false);
     return { user: publicUser(user) };
   });
 
   route('POST', '/api/auth/login', async (req, res) => {
     const body = await readBody(req);
-    const username = String(body.username || '').trim().toLowerCase();
+    const username = String(body.username || '').trim().toLowerCase().slice(0, 64);
+    const key = clientIp(req) + '|' + username;
+    checkLoginLimit(key);
     const user = Object.values(D.users).find((u) => u.username === username);
-    if (!user || !checkPassword(String(body.password || ''), user)) throw new HttpError(401, 'Wrong username or password');
-    startSession(res, user);
+    if (!user || !checkPassword(String(body.password || ''), user)) {
+      noteLoginFail(key);
+      throw new HttpError(401, 'Wrong username or password');
+    }
+    loginFails.delete(key);
+    startSession(req, res, user, body.remember !== false);
     return { user: publicUser(user) };
   });
 
   route('POST', '/api/auth/logout', (req, res) => {
     const sid = parseCookies(req.headers.cookie).sid;
     if (sid) { delete D.sessions[sid]; db.save(); }
-    res.setHeader('Set-Cookie', 'sid=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0');
+    res.setHeader('Set-Cookie', sessionCookie(req, '', 0));
     return { ok: true };
   });
 
@@ -273,6 +326,31 @@ function createApp({ dataDir = path.join(__dirname, 'data'), seedSamples = true 
     db.save();
     return { user: publicUser(user) };
   });
+
+  route('PUT', '/api/me/password', async (req, res) => {
+    const user = requireUser(req);
+    const body = await readBody(req);
+    if (!checkPassword(String(body.currentPassword || ''), user)) throw new HttpError(400, 'Your current password is wrong');
+    const password = validPassword(body.newPassword);
+    if (password.toLowerCase() === user.username) throw new HttpError(400, 'Pick a password that isn’t your username');
+    const { salt, hash } = hashPassword(password);
+    user.salt = salt; user.passHash = hash;
+    // Sign out every other device; keep this one signed in.
+    const mine = parseCookies(req.headers.cookie).sid;
+    for (const [k, s] of Object.entries(D.sessions)) if (s.userId === user.id && k !== mine) delete D.sessions[k];
+    db.save();
+    return { ok: true };
+  });
+
+  route('POST', '/api/auth/logout-everywhere', (req, res) => {
+    const user = requireUser(req);
+    for (const [k, s] of Object.entries(D.sessions)) if (s.userId === user.id) delete D.sessions[k];
+    db.save();
+    res.setHeader('Set-Cookie', sessionCookie(req, '', 0));
+    return { ok: true };
+  });
+
+  route('GET', '/healthz', () => ({ ok: true, storage: db.kind }));
 
   route('GET', '/api/apps', (req, res, params, query) => ({
     apps: listApps({
@@ -302,7 +380,7 @@ function createApp({ dataDir = path.join(__dirname, 'data'), seedSamples = true 
       versions: [{ version, notes: str(body.notes || 'First release', 'Release notes', { max: 1000 }), createdAt: now(), size: Buffer.byteLength(html) }],
       installs: 0, opens: 0, createdAt: now(), updatedAt: now(),
     };
-    db.writeCode(app.id, version, html);
+    await db.writeCode(app.id, version, html);
     D.apps[app.id] = app;
     db.save();
     return { app: publicApp(app, user, true) };
@@ -329,7 +407,7 @@ function createApp({ dataDir = path.join(__dirname, 'data'), seedSamples = true 
       if (app.versions.some((v) => v.version === version)) {
         throw new HttpError(409, `Version ${version} already exists — use a new version number`);
       }
-      db.writeCode(app.id, version, html);
+      await db.writeCode(app.id, version, html);
       app.versions.push({ version, notes: str(body.notes, 'Release notes', { max: 1000 }), createdAt: now(), size: Buffer.byteLength(html) });
       app.currentVersion = version;
     }
@@ -338,13 +416,13 @@ function createApp({ dataDir = path.join(__dirname, 'data'), seedSamples = true 
     return { app: publicApp(app, user, true) };
   });
 
-  route('DELETE', '/api/apps/:id', (req, res, { id }) => {
+  route('DELETE', '/api/apps/:id', async (req, res, { id }) => {
     const user = requireUser(req);
     const app = ownApp(id, user);
     delete D.apps[app.id];
     delete D.reviews[app.id];
     for (const uid of Object.keys(D.installs)) D.installs[uid] = D.installs[uid].filter((x) => x !== app.id);
-    db.deleteCode(app.id);
+    await db.deleteCode(app.id);
     db.save();
     return { ok: true };
   });
@@ -401,19 +479,19 @@ function createApp({ dataDir = path.join(__dirname, 'data'), seedSamples = true 
     return { apps: Object.values(D.apps).filter((a) => a.ownerId === user.id).map((a) => publicApp(a, user, true)) };
   });
 
-  route('GET', '/api/dev/apps/:id/code', (req, res, { id }) => {
+  route('GET', '/api/dev/apps/:id/code', async (req, res, { id }) => {
     const user = requireUser(req);
     const app = ownApp(id, user);
-    return { version: app.currentVersion, html: db.readCode(app.id, app.currentVersion) || '' };
+    return { version: app.currentVersion, html: (await db.readCode(app.id, app.currentVersion)) || '' };
   });
 
   // Run an app. Served with a sandbox CSP so even when opened directly it
   // gets an opaque origin. The store also fetches this and runs it in a
   // sandboxed iframe (see public/app.js).
-  route('GET', '/run/:id', (req, res, { id }, query) => {
+  route('GET', '/run/:id', async (req, res, { id }, query) => {
     const app = getApp(id);
     const version = query.get('v') && app.versions.some((v) => v.version === query.get('v')) ? query.get('v') : app.currentVersion;
-    const html = db.readCode(app.id, version);
+    const html = await db.readCode(app.id, version);
     if (html == null) throw new HttpError(404, 'App code missing');
     if (!query.has('preview')) { app.opens++; db.save(); }
     res.writeHead(200, {
@@ -425,9 +503,9 @@ function createApp({ dataDir = path.join(__dirname, 'data'), seedSamples = true 
     res.end(html);
   });
 
-  route('GET', '/download/:id', (req, res, { id }) => {
+  route('GET', '/download/:id', async (req, res, { id }) => {
     const app = getApp(id);
-    const html = db.readCode(app.id, app.currentVersion) || '';
+    const html = (await db.readCode(app.id, app.currentVersion)) || '';
     res.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8',
       'Content-Disposition': `attachment; filename="${app.slug}-${app.currentVersion.replace(/[^\w.-]/g, '')}.html"`,
@@ -463,6 +541,7 @@ function createApp({ dataDir = path.join(__dirname, 'data'), seedSamples = true 
       if (isApi && req.method !== 'GET' && req.headers['x-store-client'] !== '1') {
         throw new HttpError(403, 'Missing X-Store-Client header');
       }
+      if (isApi) renewSession(req, res);
       for (const r of routes) {
         if (r.method !== req.method) continue;
         const m = r.re.exec(url.pathname);
@@ -491,10 +570,15 @@ function createApp({ dataDir = path.join(__dirname, 'data'), seedSamples = true 
 module.exports = { createApp, CATEGORIES };
 
 if (require.main === module) {
-  const port = Number(process.env.PORT) || 3000;
-  const server = createApp({ dataDir: process.env.DATA_DIR || path.join(__dirname, 'data') });
-  server.listen(port, () => console.log(`App Store running at http://localhost:${port}`));
-  const shutdown = () => { server.db.flush(); process.exit(0); };
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+  (async () => {
+    const port = Number(process.env.PORT) || 3000;
+    const server = await createApp({
+      dataDir: process.env.DATA_DIR || path.join(__dirname, 'data'),
+      databaseUrl: process.env.DATABASE_URL || '',
+    });
+    server.listen(port, () => console.log(`App Store running at http://localhost:${port} (saving to ${server.db.kind})`));
+    const shutdown = async () => { await server.db.close(); process.exit(0); };
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+  })().catch((err) => { console.error('Could not start the App Store:', err.message); process.exit(1); });
 }

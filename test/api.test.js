@@ -6,17 +6,26 @@ const os = require('os');
 const path = require('path');
 const { createApp } = require('../server');
 
+// Runs against files by default; set TEST_DATABASE_URL to run against Postgres.
+const databaseUrl = process.env.TEST_DATABASE_URL || '';
 let server, base, dataDir;
 
 test.before(async () => {
   dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'appstore-test-'));
-  server = createApp({ dataDir });
+  if (databaseUrl) {
+    const { Pool } = require('pg');
+    const pool = new Pool({ connectionString: databaseUrl });
+    await pool.query('DROP TABLE IF EXISTS appstore_kv');
+    await pool.end();
+  }
+  server = await createApp({ dataDir, databaseUrl });
   await new Promise((r) => server.listen(0, r));
   base = `http://127.0.0.1:${server.address().port}`;
 });
 
-test.after(() => {
+test.after(async () => {
   server.close();
+  await server.db.close();
   fs.rmSync(dataDir, { recursive: true, force: true });
 });
 
@@ -51,10 +60,10 @@ test('full developer → user flow', async () => {
 
   // Signing up works and publishing requires an account.
   assert.strictEqual((await dev('POST', '/api/apps', { name: 'X', html: HTML })).status, 401);
-  const su = await dev('POST', '/api/auth/signup', { username: 'alice', password: 'secret1', displayName: 'Alice Apps' });
+  const su = await dev('POST', '/api/auth/signup', { username: 'alice', password: 'secret-one-1', displayName: 'Alice Apps' });
   assert.strictEqual(su.status, 200);
   assert.strictEqual(su.body.user.displayName, 'Alice Apps');
-  assert.strictEqual((await dev('POST', '/api/auth/signup', { username: 'Alice', password: 'secret1' })).status, 409);
+  assert.strictEqual((await dev('POST', '/api/auth/signup', { username: 'Alice', password: 'secret-one-1' })).status, 409);
 
   // Publish.
   const pub = await dev('POST', '/api/apps', {
@@ -85,7 +94,7 @@ test('full developer → user flow', async () => {
 
   // Install requires sign in, then shows up in library.
   assert.strictEqual((await user('POST', `/api/apps/${id}/install`)).status, 401);
-  await user('POST', '/api/auth/signup', { username: 'bob', password: 'secret2' });
+  await user('POST', '/api/auth/signup', { username: 'bob', password: 'secret-two-2' });
   const inst = await user('POST', `/api/apps/${id}/install`);
   assert.strictEqual(inst.body.app.installed, true);
   assert.strictEqual(inst.body.app.installs, 1);
@@ -124,44 +133,85 @@ test('full developer → user flow', async () => {
 
 test('login, logout and wrong passwords', async () => {
   const c = client();
-  await c('POST', '/api/auth/signup', { username: 'carol', password: 'pass123' });
+  await c('POST', '/api/auth/signup', { username: 'carol', password: 'pass-word-123' });
   await c('POST', '/api/auth/logout');
   assert.strictEqual((await c('GET', '/api/me')).body.user, null);
   assert.strictEqual((await c('POST', '/api/auth/login', { username: 'carol', password: 'nope' })).status, 401);
   assert.strictEqual((await c('POST', '/api/auth/login', { username: 'storeteam', password: '' })).status, 401);
-  const ok = await c('POST', '/api/auth/login', { username: 'CAROL', password: 'pass123' });
+  const ok = await c('POST', '/api/auth/login', { username: 'CAROL', password: 'pass-word-123' });
   assert.strictEqual(ok.body.user.username, 'carol');
 });
 
 test('mutating API calls require the store client header (CSRF guard)', async () => {
   const c = client();
-  const r = await c('POST', '/api/auth/signup', { username: 'dave', password: 'pass123' }, {});
+  const r = await c('POST', '/api/auth/signup', { username: 'dave', password: 'pass-word-123' }, {});
   assert.strictEqual(r.status, 403);
 });
 
 test('validation rejects bad input', async () => {
   const c = client();
-  await c('POST', '/api/auth/signup', { username: 'erin', password: 'pass123' });
+  await c('POST', '/api/auth/signup', { username: 'erin', password: 'pass-word-123' });
   assert.strictEqual((await c('POST', '/api/apps', { name: 'No code' })).status, 400);
   assert.strictEqual((await c('POST', '/api/apps', { name: 'Bad ver', html: HTML, version: '../x' })).status, 400);
   assert.strictEqual((await c('POST', '/api/apps', { name: 'Bad icon', html: HTML, icon: { type: 'image', data: 'data:image/svg+xml;base64,AAAA' } })).status, 400);
-  assert.strictEqual((await c('POST', '/api/auth/signup', { username: 'x', password: 'pass123' })).status, 400);
+  assert.strictEqual((await c('POST', '/api/auth/signup', { username: 'x', password: 'pass-word-123' })).status, 400);
 });
 
 test('data persists across restarts', async () => {
-  server.db.flush();
-  const again = createApp({ dataDir });
+  await server.db.flush();
+  const again = await createApp({ dataDir, databaseUrl });
   await new Promise((r) => again.listen(0, r));
   try {
     const res = await fetch(`http://127.0.0.1:${again.address().port}/api/apps?q=star`);
     const { apps } = await res.json();
     assert.ok(apps.some((a) => a.name === 'Star Catcher'));
     assert.strictEqual(Object.values(again.db.data.users).filter((u) => u.username === 'storeteam').length, 1);
-  } finally { again.close(); }
+  } finally { again.close(); await again.db.close(); }
 });
 
 test('serves the store front end', async () => {
   const r = await fetch(base + '/');
   assert.match(await r.text(), /<title>App Store<\/title>/);
   assert.strictEqual((await fetch(base + '/missing.js')).status, 404);
+});
+
+test('accounts: strong passwords, remembered sign-in, password change', async () => {
+  const c = client();
+  assert.strictEqual((await c('POST', '/api/auth/signup', { username: 'frank', password: 'short' })).status, 400);
+  assert.strictEqual((await c('POST', '/api/auth/signup', { username: 'hankhank', password: 'HankHank' })).status, 400);
+  const su = await c('POST', '/api/auth/signup', { username: 'frank', password: 'correct horse' });
+  assert.strictEqual(su.status, 200);
+  // Remembered on the device: a long-lived, HttpOnly cookie.
+  const cookie = su.headers.get('set-cookie');
+  assert.match(cookie, /HttpOnly/);
+  assert.match(cookie, /Max-Age=5184000/);
+  // Not remembered: a browser-session cookie.
+  const temp = client();
+  const li = await temp('POST', '/api/auth/login', { username: 'frank', password: 'correct horse', remember: false });
+  assert.doesNotMatch(li.headers.get('set-cookie'), /Max-Age/);
+  // Change password: wrong current password is refused; others get signed out.
+  assert.strictEqual((await c('PUT', '/api/me/password', { currentPassword: 'nope nope', newPassword: 'battery staple' })).status, 400);
+  assert.strictEqual((await c('PUT', '/api/me/password', { currentPassword: 'correct horse', newPassword: 'battery staple' })).status, 200);
+  assert.strictEqual((await c('GET', '/api/me')).body.user.username, 'frank');
+  assert.strictEqual((await temp('GET', '/api/me')).body.user, null);
+  const relog = client();
+  assert.strictEqual((await relog('POST', '/api/auth/login', { username: 'frank', password: 'correct horse' })).status, 401);
+  assert.strictEqual((await relog('POST', '/api/auth/login', { username: 'frank', password: 'battery staple' })).status, 200);
+});
+
+test('secure cookie behind HTTPS and sign-in attempt limit', async () => {
+  const c = client();
+  const r = await c('POST', '/api/auth/signup', { username: 'gina', password: 'long password' }, { 'X-Store-Client': '1', 'X-Forwarded-Proto': 'https' });
+  assert.match(r.headers.get('set-cookie'), /; Secure/);
+  const h = { 'X-Store-Client': '1', 'X-Forwarded-For': '203.0.113.9' };
+  const bad = client();
+  for (let i = 0; i < 10; i++) assert.strictEqual((await bad('POST', '/api/auth/login', { username: 'gina', password: 'wrong ' + i }, h)).status, 401);
+  assert.strictEqual((await bad('POST', '/api/auth/login', { username: 'gina', password: 'long password' }, h)).status, 429);
+  // Other places can still sign in.
+  assert.strictEqual((await client()('POST', '/api/auth/login', { username: 'gina', password: 'long password' })).status, 200);
+});
+
+test('health check reports storage', async () => {
+  const r = await fetch(base + '/healthz');
+  assert.deepStrictEqual(await r.json(), { ok: true, storage: databaseUrl ? 'postgres' : 'files' });
 });

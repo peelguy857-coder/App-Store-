@@ -6,17 +6,29 @@ sideloading or installs on their device.
 
 ## Run it
 
-Requires Node.js 18+ and has no dependencies.
+Requires Node.js 18+.
 
 ```bash
+npm install
 npm start            # http://localhost:3000
-npm test             # API tests
+npm test             # API tests (set TEST_DATABASE_URL to also test against Postgres)
 ```
 
-Options: `PORT=8080` and `DATA_DIR=/path/to/data` (default `./data`).
+Settings:
+- `PORT`: the port to listen on (default 3000).
+- `DATABASE_URL`: a PostgreSQL connection string. Accounts, apps and reviews are saved there.
+- `DATA_DIR`: when there's no `DATABASE_URL`, data is saved as files here (default `./data`).
 
-To let other people use your store, run it on any server or host that runs Node
-(Render, Railway, Fly.io, a VPS, …) and keep `DATA_DIR` on persistent storage.
+**To put it online, follow [DEPLOY.md](DEPLOY.md)** (Render, with a one-click `render.yaml`).
+
+## Accounts
+
+- People create an account with a **username and password**.
+- Passwords are hashed with scrypt and never stored or shown in plain text. They need at least 8 characters.
+- **Keep me signed in on this device** (on by default) saves a secure, HttpOnly cookie for 60 days, renewed while
+  the person keeps using the store. With it off, the sign-in lasts until the browser closes.
+- Ten wrong passwords for one username from one place block more tries for 15 minutes.
+- People can change their password, which signs out their other devices, or sign out of all devices.
 
 ## What you can do
 
@@ -40,17 +52,18 @@ An app is a single HTML file (inline CSS and JavaScript, up to 2 MB). Embed imag
 
 - Apps run in a sandboxed iframe with an opaque origin. They can't read the store's cookies, call its API,
   or touch other apps' data. `/run/:id` and `/download/:id` also send a `Content-Security-Policy: sandbox` header.
-- Passwords are hashed with scrypt. Sessions use HttpOnly, SameSite=Lax cookies.
+- Passwords are hashed with scrypt. Sessions use HttpOnly, SameSite=Lax cookies, marked Secure over HTTPS.
 - Write API calls require an `X-Store-Client` header (CSRF guard).
 
 ## Project layout
 
 ```
 server.js          HTTP server + REST API
-lib/db.js          JSON-file storage (data/db.json + data/apps/<id>/<version>.html)
+lib/db.js          storage: PostgreSQL (DATABASE_URL) or files (data/db.json + data/apps/<id>/<version>.html)
 lib/seed.js        sample apps added on first run
 lib/samples/       sample apps' HTML (Star Catcher, Quick Notes, Calculator, Pixel Paint, Focus Timer)
 public/            the store front end (vanilla JS single-page app)
+render.yaml        one-click Render setup (website + database)
 test/              API tests (node:test)
 ```
 

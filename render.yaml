@@ -1,0 +1,21 @@
+# One-click setup on Render (https://render.com): New + > Blueprint > pick this repo.
+# Creates the website and a Postgres database, and connects them.
+services:
+  - type: web
+    name: app-store
+    runtime: node
+    plan: free
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: app-store-db
+          property: connectionString
+
+databases:
+  - name: app-store-db
+    plan: free
+    databaseName: appstore
+    user: appstore
